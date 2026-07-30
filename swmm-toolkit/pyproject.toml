@@ -35,7 +35,7 @@ cmake.args = ["-GVisual Studio 17 2022"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "darwin"
-cmake.args = ["-GXcode", "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=11.0"]
+cmake.args = ["-GUnix Makefiles", "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=11.0"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "linux"
