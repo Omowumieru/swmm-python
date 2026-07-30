@@ -27,6 +27,9 @@ OUTPUT_FILE_TEST_3 = os.path.join(DATA_PATH, 'temp_Example3.out')
 INPUT_FILE_INLET = os.path.join(DATA_PATH, 'test_inlet_drains.inp')
 REPORT_FILE_INLET = os.path.join(DATA_PATH, 'temp_inlet_drains.rpt')
 OUTPUT_FILE_INLET = os.path.join(DATA_PATH, 'temp_inlet_drains.out')
+INPUT_FILE_GW = os.path.join(DATA_PATH, 'test_groundwater.inp')
+REPORT_FILE_GW = os.path.join(DATA_PATH, 'temp_groundwater.rpt')
+OUTPUT_FILE_GW = os.path.join(DATA_PATH, 'temp_groundwater.out')
 
 INPUT_FILE_FAIL = os.path.join(DATA_PATH, 'temp_nodata.inp')
 
@@ -114,6 +117,18 @@ def run_inlet_sim(request):
 def run_pollut_sim(request):
     solver.swmm_open(INPUT_FILE_EXAMPLE_3, REPORT_FILE_TEST_3, OUTPUT_FILE_TEST_3)
     solver.swmm_start(0)
+
+    def close():
+        solver.swmm_end()
+        solver.swmm_close()
+
+    request.addfinalizer(close)
+
+@pytest.fixture()
+def run_gw_sim(request):
+    solver.swmm_open(INPUT_FILE_GW, REPORT_FILE_GW, OUTPUT_FILE_GW)
+    solver.swmm_start(0)
+    solver.swmm_step()
 
     def close():
         solver.swmm_end()
@@ -851,3 +866,78 @@ def test_hotstart(run_inlet_sim):
     new_depth = solver.node_get_result(0, shared_enum.NodeResult.DEPTH)
     assert prev_depth > 0
     assert prev_depth == pytest.approx(new_depth, 0.1)
+
+
+def test_gwaterstate_get(run_gw_sim):
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '1')
+    state = solver.gw_get_state(index)
+
+    # Aquifer GW1 starts at upper moisture content 0.30 with the water table
+    # at elevation 1000 and an aquifer bottom of 990
+    assert state.theta == pytest.approx(0.30, abs=1e-3)
+    assert state.gwtElev == pytest.approx(1000.0, abs=0.1)
+    assert state.maxInfilVol > 0
+
+
+def test_gwaterstate_set(run_gw_sim):
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '1')
+
+    solver.gw_set_state(index, {
+        'theta': 0.25,
+        'gwt_elev': 995.0,
+        'max_infil_volume': 3.0,
+    })
+
+    state = solver.gw_get_state(index)
+    assert state.theta == pytest.approx(0.25)
+    assert state.gwtElev == pytest.approx(995.0)
+    assert state.maxInfilVol == pytest.approx(3.0)
+
+
+def test_gwaterstate_set_partial(run_gw_sim):
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '1')
+    before = solver.gw_get_state(index)
+
+    solver.gw_set_state(index, {'gwt_elev': 998.0})
+
+    after = solver.gw_get_state(index)
+    assert after.gwtElev == pytest.approx(998.0)
+    assert after.theta == pytest.approx(before.theta)
+    assert after.maxInfilVol == pytest.approx(before.maxInfilVol)
+
+
+def test_gwaterstate_set_leaves_omitted_members_alone(run_gw_sim):
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '1')
+    before = solver.gw_get_state(index)
+
+    solver.gw_set_state(index, {})
+    solver.gw_set_state(index, {'theta': None, 'gwt_elev': None})
+
+    after = solver.gw_get_state(index)
+    assert after.theta == pytest.approx(before.theta)
+    assert after.gwtElev == pytest.approx(before.gwtElev)
+
+
+def test_gwaterstate_set_bad_input(run_gw_sim):
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '1')
+
+    # a misspelled key would otherwise be silently ignored
+    with pytest.raises(KeyError):
+        solver.gw_set_state(index, {'gwt_elve': 998.0})
+
+    with pytest.raises(TypeError):
+        solver.gw_set_state(index, {'gwt_elev': 'high'})
+
+    with pytest.raises(TypeError):
+        solver.gw_set_state(index, [0.25, 998.0, 0.0, 3.0])
+
+
+def test_gwaterstate_without_aquifer(run_gw_sim):
+    # Subcatchment 2 has no [GROUNDWATER] entry, so its groundwater pointer is
+    # NULL. Reading is an error; writing has nothing to write to and is a no-op.
+    index = solver.project_get_index(shared_enum.ObjectType.SUBCATCH, '2')
+
+    with pytest.raises(Exception):
+        solver.gw_get_state(index)
+
+    solver.gw_set_state(index, {'theta': 0.30})
