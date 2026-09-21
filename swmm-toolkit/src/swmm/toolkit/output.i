@@ -8,6 +8,20 @@
  *
 */
 
+%{
+// added to fix problems during compilation with PyInt_FromLong which is deprecated in Python 3
+#if PY_MAJOR_VERSION >= 3
+#ifndef PyInt_FromLong
+#define PyInt_FromLong PyLong_FromLong
+#endif
+#ifndef PyInt_AsLong
+#define PyInt_AsLong PyLong_AsLong
+#endif
+#ifndef PyInt_Check
+#define PyInt_Check PyLong_Check
+#endif
+#endif
+%}
 
 %include "typemaps.i"
 %include "cstring.i"

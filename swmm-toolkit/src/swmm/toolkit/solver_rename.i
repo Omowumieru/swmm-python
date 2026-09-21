@@ -85,7 +85,7 @@
 
 %rename(gw_get_state)                       swmm_getGWaterState;
 %rename(gw_set_state)                       swmm_setGWaterState;
-
+%rename(gw_set_custom_eqns)                 swmm_setGWaterEqn;
 
 %rename(system_get_routing_totals)          swmm_getSystemRoutingTotals;
 %rename(system_get_runoff_totals)           swmm_getSystemRunoffTotals;
