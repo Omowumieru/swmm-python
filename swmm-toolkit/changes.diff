@@ -1,0 +1,82 @@
+diff --git a/swmm-toolkit/pyproject.toml b/swmm-toolkit/pyproject.toml
+index e49732e..ebd526a 100644
+--- a/swmm-toolkit/pyproject.toml
++++ b/swmm-toolkit/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
+ 
+ [project]
+ name = "swmm-toolkit"
+-version = "0.16.2"
++version = "0.16.2.1"
+ description = "PySWMM SWMM Python Toolkit"
+ readme = { file = "README.md", content-type = "text/markdown" }
+ license = "CC0-1.0 AND (MIT OR Apache-2.0)"
+diff --git a/swmm-toolkit/src/swmm/toolkit/solver_rename.i b/swmm-toolkit/src/swmm/toolkit/solver_rename.i
+index 14db818..b64bbd4 100644
+--- a/swmm-toolkit/src/swmm/toolkit/solver_rename.i
++++ b/swmm-toolkit/src/swmm/toolkit/solver_rename.i
+@@ -18,6 +18,7 @@
+ %rename (SubcatchStats)                     SM_SubcatchStats;
+ %rename (RoutingTotals)                     SM_RoutingTotals;
+ %rename (RunoffTotals)                      SM_RunoffTotals;
++%rename (GWState)                           SM_GWaterState;
+ 
+ 
+ // RENAME CANONICAL API AS NECESSARY
+@@ -82,6 +83,9 @@
+ %rename(subcatch_get_pollutant)             swmm_getSubcatchPollut;
+ %rename(subcatch_get_stats)                 swmm_getSubcatchStats;
+ 
++%rename(gw_get_state)                       swmm_getGWaterState;
++%rename(gw_set_state)                       swmm_setGWaterState;
++
+ 
+ %rename(system_get_routing_totals)          swmm_getSystemRoutingTotals;
+ %rename(system_get_runoff_totals)           swmm_getSystemRunoffTotals;
+diff --git a/swmm-toolkit/src/swmm/toolkit/stats_typemaps.i b/swmm-toolkit/src/swmm/toolkit/stats_typemaps.i
+index c744cef..9b3570b 100644
+--- a/swmm-toolkit/src/swmm/toolkit/stats_typemaps.i
++++ b/swmm-toolkit/src/swmm/toolkit/stats_typemaps.i
+@@ -83,6 +83,10 @@
+     SM_SubcatchStats *subcatchStats
+ }
+ 
++%statsmaps(SM_GWaterState);
++%apply SM_GWaterState *out_stats {
++    SM_GWaterState *gWaterState
++}
+ 
+ %statsmaps(SM_RoutingTotals);
+ %apply SM_RoutingTotals *out_stats {
+@@ -95,6 +99,24 @@
+     SM_RunoffTotals *runoffTotals
+ }
+ 
++/* Added so four item python list can be passed into the solver as double x[4] */
++%typemap(in) double x[4] (double temp[4]) {
++  if (PyList_Check($input)) {
++    if (PyList_Size($input) == 4) {
++      int i;
++      for (i = 0; i < 4; i++) {
++        temp[i] = PyFloat_AsDouble(PyList_GetItem($input, i));
++      }
++      $1 = temp;
++    } else {
++      PyErr_SetString(PyExc_TypeError, "Input list must have 4 elements.");
++      return NULL;
++    }
++  } else {
++    PyErr_SetString(PyExc_TypeError, "Input is not a list.");
++    return NULL;
++  }
++}
+ 
+ /* WRAP PUBLIC STRUCTURES AND GENERATE GETTERS */
+ %immutable;
+diff --git a/swmm-toolkit/swmm-solver b/swmm-toolkit/swmm-solver
+index e65afce..01e1460 160000
+--- a/swmm-toolkit/swmm-solver
++++ b/swmm-toolkit/swmm-solver
+@@ -1 +1 @@
+-Subproject commit e65afced3c36bb071f84df9d25e7c2441f1a7f19
++Subproject commit 01e1460d53d3b7e2b96696b0af6860231fae80b5-dirty
